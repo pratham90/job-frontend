@@ -1,5 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { api } from '../../constants/api';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,7 +21,7 @@ export default function Index(){
   const [jobs, setJobs] = useState<any[]>([]);
   const [current, setCurrent] = useState(0);
   const [saved, setSaved] = useState<any[]>([]);
-  const [appliedJobs, setAppliedJobs] = useState<any[]>([]);
+  // const [appliedJobs, setAppliedJobs] = useState<any[]>([]); // Removed unused state
   const job = jobs[current];
   // Always check saved state for the current job, fallback to false if no job
   const isSaved = job && saved.length > 0 ? saved.some((j) => (j.id || j._id) === (job.id || job._id)) : false;
@@ -32,30 +34,31 @@ export default function Index(){
   const SWIPE_LIMIT = 20;
   const SWIPE_WINDOW = 24 * 60 * 60 * 1000; // 24 hours in ms
 
-  // Fetch jobs from backend for this user
-  useEffect(() => {
-    const fetchJobs = async () => {
-      if (!user?.id) return;
-      try {
-        // Fetch jobs without location filter (location selection is now in Profile)
-        const res = await fetch(`http://192.168.100.2:3000/api/recommend/${user.id}?limit=40`);
-        if (!res.ok) throw new Error('Failed to fetch jobs');
-        const data = await res.json();
-        setJobs(data.map((item: any) => ({ ...item.job, matchPercentage: Math.round(item.match_score * 100) })));
-        setCurrent(0);
-      } catch {
-        setJobs([]);
-      }
-    };
-    fetchJobs();
-  }, [user?.id, SWIPE_WINDOW]);
+  // Fetch jobs from backend for this user on tab focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchJobs = async () => {
+        if (!user?.id) return;
+        try {
+          const res = await fetch(api.recommend(user.id, { limit: 40 }));
+          if (!res.ok) throw new Error('Failed to fetch jobs');
+          const data = await res.json();
+          setJobs(data.map((item: any) => ({ ...item.job, matchPercentage: Math.round(item.match_score * 100) })));
+          setCurrent(0);
+        } catch {
+          setJobs([]);
+        }
+      };
+      fetchJobs();
+    }, [user?.id])
+  );
 
   // Fetch saved jobs for this user (for isSaved state and Saved tab parity)
   useEffect(() => {
     const fetchSaved = async () => {
       if (!user?.id) return;
       try {
-        const res = await fetch(`http://192.168.100.2:3000/api/recommend/saved/${user.id}`);
+        const res = await fetch(api.saved(user.id));
         if (!res.ok) throw new Error('Failed to fetch saved jobs');
         const data = await res.json();
         setSaved(Array.isArray(data) ? data : []);
@@ -64,7 +67,7 @@ export default function Index(){
       }
     };
     fetchSaved();
-  }, [user?.id]);
+  }, [user?.id, SWIPE_WINDOW]);
 
   // Reset swipe state on user change
   useEffect(() => {
@@ -125,7 +128,7 @@ export default function Index(){
       };
       console.log('Sending LIKE to backend:', payload);
 
-      const res = await fetch('http://192.168.100.2:3000/api/recommend/swipe', {
+  const res = await fetch(api.swipe(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -161,7 +164,6 @@ export default function Index(){
     if (newCount >= SWIPE_LIMIT) setSwipeBlocked(true);
     AsyncStorage.setItem(`swipe_${user.id}`, JSON.stringify({ count: newCount, start: newStart }));
     if (type === 'accept') {
-      setAppliedJobs((prev) => [...prev, jobObj]);
       saveAppliedJob(jobObj); // 'like' action
       setCurrent((prev) => prev + 1);
       // Debugging: Alert and log
@@ -174,7 +176,7 @@ export default function Index(){
       if (userId && jobId) {
         if (typeof window !== 'undefined' && window.alert) window.alert('Pass (dislike) triggered for job: ' + jobObj.title);
         console.log('Sending DISLIKE to backend:', { user_id: userId, job_id: jobId, action: 'dislike', job_payload: jobObj });
-        fetch('http://192.168.100.2:3000/api/recommend/swipe', {
+  fetch(api.swipe(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: userId, job_id: jobId, action: 'dislike', job_payload: jobObj }),
@@ -195,14 +197,14 @@ export default function Index(){
     const currentlySaved = saved.some((j) => (j.id || j._id) === jobId);
     try {
       if (currentlySaved) {
-        await fetch('http://192.168.100.2:3000/api/recommend/saved/remove', {
+  await fetch(api.removeSaved(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: userId, job_id: jobId }),
         });
         setSaved((prev) => prev.filter((j) => (j.id || j._id) !== jobId));
       } else {
-        await fetch('http://192.168.100.2:3000/api/recommend/swipe', {
+  await fetch(api.swipe(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: userId, job_id: jobId, action: 'save', job_payload: jobObj }),

@@ -1,4 +1,5 @@
-export const API_BASE = "http://192.168.100.2:3000";
+const API_BASE = "https://job-assis-povz.onrender.com";
+console.log('[API] Using API_BASE:', API_BASE);
 
 export const api = {
   recommend: (clerkId: string, params?: Record<string, string | number | undefined>) => {

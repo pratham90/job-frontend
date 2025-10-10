@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
+import { api } from '../../constants/api';
 import { Dimensions, FlatList, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,7 +23,7 @@ export default function SavedScreen() {
 				return;
 			}
 			try {
-				const res = await fetch(`http://192.168.100.2:3000/api/recommend/saved/${user.id}`, { cache: 'no-store' });
+		const res = await fetch(api.saved(user.id), { cache: 'no-store' }); // api.saved uses deployed link
 				if (!res.ok) throw new Error('Failed to fetch saved jobs');
 				const data = await res.json();
 				// Flatten job_details if present
@@ -46,7 +47,7 @@ export default function SavedScreen() {
 		const removeSaved = useCallback(async (jobId: string) => {
 			if (!user?.id) return;
 			try {
-				const res = await fetch('http://192.168.100.2:3000/api/recommend/saved/remove', {
+		const res = await fetch(api.removeSaved(), {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ user_id: user.id, job_id: jobId }),

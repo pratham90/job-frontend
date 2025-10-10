@@ -1,22 +1,20 @@
-import LocationPreference from '../../components/LocationPreference';
-
-
-import * as DocumentPicker from 'expo-document-picker';
-import { Platform } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState, useEffect } from 'react';
+import { Platform, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LocationPreference from '../../components/LocationPreference';
 import ProfileMobile from '../../components/ProfileMobile';
 import ResumeUploadMobile from '../../components/ResumeUploadMobile';
 import { useThemePreference } from '../../components/ThemePreferenceContext';
 import TopHeader from '../../components/TopHeader';
 import { LogOutIcon } from '../../components/ui/Icons';
 import { useAuth } from '../../components/AuthContext';
+import { updateUserLocation } from '../../utils/user';
 
-  const [location, setLocation] = useState('delhi');
+const RESUME_PARSER_API_KEY = process.env.RESUME_PARSER_API_KEY;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -30,6 +28,8 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { logout, user } = useAuth();
   const [location, setLocation] = useState('delhi');
+
+  // No location endpoint: only send location with resume data on upload
 
   useEffect(() => {
     const loadPhoto = async () => {
@@ -70,10 +70,13 @@ export default function ProfileScreen() {
   formData.append('clerk_id', user?.id || '');
   formData.append('location', location);
 
-      const response = await fetch('https://resume-parse-hpgv.onrender.com/api/users/upload', {
-        method: 'POST',
-        body: formData,
-      });
+      const response = await fetch(
+        RESUME_PARSER_API_KEY || 'https://resume-parse-hpgv.onrender.com/api/users/upload',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
       const text = await response.text();
       let data;
       try {
@@ -84,11 +87,17 @@ export default function ProfileScreen() {
       if (!response.ok) {
         throw new Error(data.detail || data.message || 'Failed to upload/parse resume.');
       }
-      const profile = data.profile || data.result || null;
-      setResume(profile);
-      // Persist resume for this user
-      if (user?.id && profile) {
-        await AsyncStorage.setItem(`resume_${user.id}`, JSON.stringify(profile));
+      let profile = data.profile || data.result || null;
+      if (profile) {
+        // Always use the user's selected location, not the parsed one
+        const resumeWithSelectedLocation = { ...profile, location };
+        setResume(resumeWithSelectedLocation);
+        // Persist resume for this user
+        if (user?.id) {
+          await AsyncStorage.setItem(`resume_${user.id}`, JSON.stringify(resumeWithSelectedLocation));
+          // Send to backend immediately after upload
+          updateUserLocation(user.id, resumeWithSelectedLocation);
+        }
       }
     } catch (err: any) {
       alert(err?.message || 'Failed to upload/parse resume.');

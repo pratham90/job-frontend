@@ -4,12 +4,11 @@ import { Select } from './ui/select';
 import { MapPinIcon } from './ui/Icons';
 
 export default function LocationPreference({ location, setLocation }: { location: string, setLocation: (val: string) => void }) {
-  const [locationOptions, setLocationOptions] = useState([
-    { label: 'Delhi', value: 'delhi' },
-    { label: 'Mumbai', value: 'mumbai' },
-    { label: 'Bangalore', value: 'bangalore' },
-    { label: 'Use my location', value: 'live' },
-  ]);
+  const locationOptions = [
+    { label: 'USA', value: 'usa' },
+    { label: 'INDIA', value: 'india' },
+    { label: 'Global', value: 'global' },
+  ];
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
