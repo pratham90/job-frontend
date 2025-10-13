@@ -1,8 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState, useCallback } from 'react';
+// removed duplicate Modal/Button import
 import { useFocusEffect } from '@react-navigation/native';
 import { api } from '../../constants/api';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, View, Modal, Button } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { JobCard } from '../../components/JobCard';
@@ -12,7 +13,7 @@ import { LogOutIcon } from '../../components/ui/Icons';
 // import { Select } from '../../components/ui/select';
 // import * as Location from 'expo-location';
 import { useAuth } from '../../components/AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function Index(){
@@ -27,12 +28,8 @@ export default function Index(){
   const isSaved = job && saved.length > 0 ? saved.some((j) => (j.id || j._id) === (job.id || job._id)) : false;
   // Location selection moved to Profile tab
 
-  // Swipe limit state (in-memory, per session)
-  const [swipeCount, setSwipeCount] = useState(0);
-  const [swipeStart, setSwipeStart] = useState<number | null>(null);
-  const [swipeBlocked, setSwipeBlocked] = useState(false);
-  const SWIPE_LIMIT = 20;
-  const SWIPE_WINDOW = 24 * 60 * 60 * 1000; // 24 hours in ms
+  // Remove local swipe logic, only track current index and modal
+  const [showLimitModal, setShowLimitModal] = useState(false);
 
   // Fetch jobs from backend for this user on tab focus
   useFocusEffect(
@@ -45,6 +42,7 @@ export default function Index(){
           const data = await res.json();
           setJobs(data.map((item: any) => ({ ...item.job, matchPercentage: Math.round(item.match_score * 100) })));
           setCurrent(0);
+          setShowLimitModal(false);
         } catch {
           setJobs([]);
         }
@@ -67,49 +65,9 @@ export default function Index(){
       }
     };
     fetchSaved();
-  }, [user?.id, SWIPE_WINDOW]);
-
-  // Reset swipe state on user change
-  useEffect(() => {
-    setSwipeCount(0);
-    setSwipeStart(null);
-    setSwipeBlocked(false);
   }, [user?.id]);
 
-  // Load swipe state from AsyncStorage
-  useEffect(() => {
-    const loadSwipeState = async () => {
-      if (!user?.id) return;
-      try {
-        const stored = await AsyncStorage.getItem(`swipe_${user.id}`);
-        if (stored) {
-          const { count, start } = JSON.parse(stored);
-          const now = Date.now();
-          if (now - start < SWIPE_WINDOW) {
-            setSwipeCount(count);
-            setSwipeStart(start);
-            setSwipeBlocked(count >= SWIPE_LIMIT);
-          } else {
-            setSwipeCount(0);
-            setSwipeStart(now);
-            setSwipeBlocked(false);
-            await AsyncStorage.setItem(`swipe_${user.id}`, JSON.stringify({ count: 0, start: now }));
-          }
-        } else {
-          const now = Date.now();
-          setSwipeCount(0);
-          setSwipeStart(now);
-          setSwipeBlocked(false);
-          await AsyncStorage.setItem(`swipe_${user.id}`, JSON.stringify({ count: 0, start: now }));
-        }
-      } catch {
-        setSwipeCount(0);
-        setSwipeStart(Date.now());
-        setSwipeBlocked(false);
-      }
-    };
-    loadSwipeState();
-  }, [user?.id]);
+
 
   // Save applied job to backend
   const saveAppliedJob = useCallback(async (job: any) => {
@@ -117,7 +75,7 @@ export default function Index(){
     const jobId = job?.id || job?._id;
     if (!userId || !jobId) {
       console.error('Missing user_id or job_id', { user, job });
-      return;
+      return false;
     }
     try {
       const payload = {
@@ -128,12 +86,17 @@ export default function Index(){
       };
       console.log('Sending LIKE to backend:', payload);
 
-  const res = await fetch(api.swipe(), {
+      const res = await fetch(api.swipe(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
+      if (res.status === 429) {
+        // Backend swipe limit reached
+        setShowLimitModal(true);
+        return false;
+      }
       if (!res.ok) {
         const errorText = await res.text();
         throw new Error(`Backend error: ${res.status} ${errorText}`);
@@ -141,55 +104,63 @@ export default function Index(){
 
       const data = await res.json();
       console.log('Backend LIKE response:', data);
+      return true;
     } catch (e) {
       console.error('Error sending LIKE to backend:', e);
-      // Optionally show an alert or UI error
+      return false;
     }
   }, [user]);
 
   // Handle swipe (accept/reject)
   // Fix: Pass job object directly to handleSwipe to avoid closure issues
-  const handleSwipe = useCallback((type: 'accept' | 'reject', jobObj: any) => {
-    if (swipeBlocked) return;
-    let newCount = swipeCount + 1;
-    let newStart = swipeStart ?? Date.now();
-    const now = Date.now();
-    if (now - newStart >= SWIPE_WINDOW) {
-      newCount = 1;
-      newStart = now;
-      setSwipeBlocked(false);
+  // Only allow swiping through jobs received from backend
+  const handleSwipe = useCallback(async (type: 'accept' | 'reject', jobObj: any) => {
+    if (current >= jobs.length - 1) {
+      setShowLimitModal(true);
+      return;
     }
-    setSwipeCount(newCount);
-    setSwipeStart(newStart);
-    if (newCount >= SWIPE_LIMIT) setSwipeBlocked(true);
-    AsyncStorage.setItem(`swipe_${user.id}`, JSON.stringify({ count: newCount, start: newStart }));
     if (type === 'accept') {
-      saveAppliedJob(jobObj); // 'like' action
-      setCurrent((prev) => prev + 1);
-      // Debugging: Alert and log
-      if (typeof window !== 'undefined' && window.alert) window.alert('Apply (like) triggered for job: ' + jobObj.title);
-      console.log('Apply (like) triggered for job:', jobObj);
+      const success = await saveAppliedJob(jobObj); // 'like' action
+      if (success) {
+        setCurrent((prev) => prev + 1);
+      }
+      // If not success (429), modal is already shown and index not incremented
     } else {
-      // 'dislike' action for pass
       const userId = user?.id || user?.clerk_id;
       const jobId = jobObj?.id || jobObj?._id;
       if (userId && jobId) {
-        if (typeof window !== 'undefined' && window.alert) window.alert('Pass (dislike) triggered for job: ' + jobObj.title);
-        console.log('Sending DISLIKE to backend:', { user_id: userId, job_id: jobId, action: 'dislike', job_payload: jobObj });
-  fetch(api.swipe(), {
+        fetch(api.swipe(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: userId, job_id: jobId, action: 'dislike', job_payload: jobObj }),
         })
-          .then(res => res.json())
-          .then(data => console.log('Backend DISLIKE response:', data))
+          .then(res => {
+            if (res.status === 429) {
+              setShowLimitModal(true);
+              return null;
+            }
+            return res.json();
+          })
+          .then(data => { if (data) console.log('Backend DISLIKE response:', data); })
           .catch(e => console.error('Error sending DISLIKE to backend:', e));
       }
       setCurrent((prev) => prev + 1);
     }
-  }, [swipeBlocked, swipeCount, swipeStart, user, saveAppliedJob, SWIPE_WINDOW]);
+  }, [current, jobs.length, user, saveAppliedJob]);
 
   // Toggle save/unsave and persist to backend
+  const fetchSaved = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(api.saved(user.id));
+      if (!res.ok) throw new Error('Failed to fetch saved jobs');
+      const data = await res.json();
+      setSaved(Array.isArray(data) ? data : []);
+    } catch {
+      setSaved([]);
+    }
+  }, [user?.id]);
+
   const toggleSave = useCallback(async (jobObj: any) => {
     const userId = user?.id || user?.clerk_id;
     const jobId = jobObj?.id || jobObj?._id;
@@ -197,25 +168,29 @@ export default function Index(){
     const currentlySaved = saved.some((j) => (j.id || j._id) === jobId);
     try {
       if (currentlySaved) {
-  await fetch(api.removeSaved(), {
+        await fetch(api.removeSaved(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: userId, job_id: jobId }),
         });
-        setSaved((prev) => prev.filter((j) => (j.id || j._id) !== jobId));
       } else {
-  await fetch(api.swipe(), {
+        await fetch(api.swipe(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: userId, job_id: jobId, action: 'save', job_payload: jobObj }),
         });
-        setSaved((prev) => [...prev, jobObj]);
       }
-      // Do NOT advance to next job after save/unsave
+      // Always re-fetch saved jobs after save/unsave
+      fetchSaved();
     } catch {
       // No-op on error; UI state remains unchanged
     }
-  }, [user, saved]);
+  }, [user, saved, fetchSaved]);
+
+  // Update saved jobs on mount and when user changes
+  useEffect(() => {
+    fetchSaved();
+  }, [fetchSaved]);
 
   // Location selection moved to Profile tab
 
@@ -247,11 +222,7 @@ export default function Index(){
           <LinearGradient colors={['rgba(59,130,246,0.08)', 'rgba(59,130,246,0.02)']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 120 }} />
           <Text style={styles.title}>Recommended for you</Text>
           <Text style={styles.subtitle}>Swipe through jobs. Accept to apply, save for later, or reject.</Text>
-          {swipeBlocked ? (
-            <Text style={{ color: '#ef4444', marginTop: 32, fontSize: 18, textAlign: 'center' }}>
-              You have reached your daily swipe limit of 20 jobs. Swiping will reset after 24 hours.
-            </Text>
-          ) : job ? (
+          {job ? (
             <JobCard
               job={job}
               onApply={() => handleSwipe('accept', job)}
@@ -263,6 +234,16 @@ export default function Index(){
           ) : (
             <Text style={{ color: '#888', marginTop: 32, fontSize: 18, textAlign: 'center' }}>No more jobs to show!</Text>
           )}
+          {/* Modal for swipe limit reached */}
+          <Modal visible={showLimitModal} transparent animationType="slide">
+            <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)" }}>
+              <View style={{ backgroundColor: "white", padding: 24, borderRadius: 12, alignItems: "center" }}>
+                <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 12 }}>Swipe limit reached</Text>
+                <Text style={{ marginBottom: 16 }}>You have reached your daily swipe limit. It will reset in 24 hours.</Text>
+                <Button title="OK" onPress={() => setShowLimitModal(false)} />
+              </View>
+            </View>
+          </Modal>
         </Animated.View>
       </View>
     </LinearGradient>

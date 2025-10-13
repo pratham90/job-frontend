@@ -68,7 +68,7 @@ export default function ProfileScreen() {
         type: file.mimeType || 'application/pdf',
       } as any);
   formData.append('clerk_id', user?.id || '');
-  formData.append('location', location);
+
 
       const response = await fetch(
         RESUME_PARSER_API_KEY || 'https://resume-parse-hpgv.onrender.com/api/users/upload',
