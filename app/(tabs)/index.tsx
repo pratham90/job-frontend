@@ -7,16 +7,19 @@ import { Dimensions, StyleSheet, Text, View, Modal, Button } from 'react-native'
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { JobCard } from '../../components/JobCard';
+
 // import { useJobContext } from '../../components/JobContext';
 import TopHeader from '../../components/TopHeader';
 import { LogOutIcon } from '../../components/ui/Icons';
 // import { Select } from '../../components/ui/select';
 // import * as Location from 'expo-location';
 import { useAuth } from '../../components/AuthContext';
+import { useLocation } from '../../components/LocationContext';
 
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function Index(){
+  const { location } = useLocation();
   const { logout, user } = useAuth();
   const insets = useSafeAreaInsets();
   const [jobs, setJobs] = useState<any[]>([]);
@@ -26,30 +29,31 @@ export default function Index(){
   const job = jobs[current];
   // Always check saved state for the current job, fallback to false if no job
   const isSaved = job && saved.length > 0 ? saved.some((j) => (j.id || j._id) === (job.id || job._id)) : false;
-  // Location selection moved to Profile tab
+
 
   // Remove local swipe logic, only track current index and modal
   const [showLimitModal, setShowLimitModal] = useState(false);
 
   // Fetch jobs from backend for this user on tab focus
-  useFocusEffect(
-    React.useCallback(() => {
-      const fetchJobs = async () => {
-        if (!user?.id) return;
-        try {
-          const res = await fetch(api.recommend(user.id, { limit: 40 }));
-          if (!res.ok) throw new Error('Failed to fetch jobs');
-          const data = await res.json();
-          setJobs(data.map((item: any) => ({ ...item.job, matchPercentage: Math.round(item.match_score * 100) })));
-          setCurrent(0);
-          setShowLimitModal(false);
-        } catch {
-          setJobs([]);
-        }
-      };
-      fetchJobs();
-    }, [user?.id])
-  );
+  useEffect(() => {
+    const fetchJobs = async () => {
+      if (!user?.id) return;
+      try {
+        // Pass location to backend if set
+        const params: any = { limit: 40 };
+        if (location) params.location = location;
+        const res = await fetch(api.recommend(user.id, params));
+        if (!res.ok) throw new Error('Failed to fetch jobs');
+        const data = await res.json();
+        setJobs(data.map((item: any) => ({ ...item.job, matchPercentage: Math.round(item.match_score * 100) })));
+        setCurrent(0);
+        setShowLimitModal(false);
+      } catch {
+        setJobs([]);
+      }
+    };
+    fetchJobs();
+  }, [user?.id, location]);
 
   // Fetch saved jobs for this user (for isSaved state and Saved tab parity)
   useEffect(() => {
@@ -212,7 +216,6 @@ export default function Index(){
           </View>
         }
       />
-      {/* Location selection moved to Profile tab */}
       <View style={[styles.scrollContent, { paddingHorizontal: Math.max(16, SCREEN_WIDTH * 0.05), paddingBottom: Math.max(16, insets.bottom + 72) }]}> 
         <Animated.View
           style={[styles.card, { maxWidth: 560, width: '100%', overflow: 'hidden' }]}

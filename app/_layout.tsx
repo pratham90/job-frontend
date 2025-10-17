@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import AuroraBackground from '@/components/AuroraBackground';
+import { LocationProvider } from '@/components/LocationContext';
 import { AuthProvider, useAuth } from '@/components/AuthContext';
 import { ClerkProvider } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
@@ -52,10 +53,13 @@ export default function Layout() {
   const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-  <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
         <AuthProvider>
           <ThemePreferenceProvider>
-            <ThemedRoot />
+            {/* Add LocationProvider here */}
+            <LocationProvider>
+              <ThemedRoot />
+            </LocationProvider>
           </ThemePreferenceProvider>
         </AuthProvider>
       </ClerkProvider>

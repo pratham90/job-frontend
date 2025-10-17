@@ -6,13 +6,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LocationPreference from '../../components/LocationPreference';
+import { useLocation } from '../../components/LocationContext';
 import ProfileMobile from '../../components/ProfileMobile';
 import ResumeUploadMobile from '../../components/ResumeUploadMobile';
 import { useThemePreference } from '../../components/ThemePreferenceContext';
 import TopHeader from '../../components/TopHeader';
 import { LogOutIcon } from '../../components/ui/Icons';
 import { useAuth } from '../../components/AuthContext';
-import { updateUserLocation } from '../../utils/user';
 
 const RESUME_PARSER_API_KEY = process.env.RESUME_PARSER_API_KEY;
 
@@ -27,9 +27,9 @@ export default function ProfileScreen() {
   const { preference, setPreference } = useThemePreference();
   const insets = useSafeAreaInsets();
   const { logout, user } = useAuth();
-  const [location, setLocation] = useState('delhi');
+  const { location, setLocation } = useLocation();
 
-  // No location endpoint: only send location with resume data on upload
+
 
   useEffect(() => {
     const loadPhoto = async () => {
@@ -58,7 +58,11 @@ export default function ProfileScreen() {
     const result = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'], copyToCacheDirectory: true });
     if (result.canceled || !result.assets?.[0]) return;
     setUploading(true);
-    setProgress(0);
+    setProgress(1);
+    // Progress interval logic
+    const progressInterval = setInterval(() => {
+      setProgress((prev) => (prev < 98 ? prev + Math.floor(Math.random() * 4) + 1 : prev));
+    }, 400);
     try {
       const file = result.assets[0];
       const formData = new FormData();
@@ -67,8 +71,7 @@ export default function ProfileScreen() {
         name: file.name || 'resume.pdf',
         type: file.mimeType || 'application/pdf',
       } as any);
-  formData.append('clerk_id', user?.id || '');
-
+      formData.append('clerk_id', user?.id || '');
 
       const response = await fetch(
         RESUME_PARSER_API_KEY || 'https://resume-parse-hpgv.onrender.com/api/users/upload',
@@ -87,23 +90,24 @@ export default function ProfileScreen() {
       if (!response.ok) {
         throw new Error(data.detail || data.message || 'Failed to upload/parse resume.');
       }
+      // Resume parsed successfully, jump to 100%
+      clearInterval(progressInterval);
+      setProgress(100);
+      setTimeout(() => setUploading(false), 500);
       let profile = data.profile || data.result || null;
       if (profile) {
         // Always use the user's selected location, not the parsed one
-        const resumeWithSelectedLocation = { ...profile, location };
+        const resumeWithSelectedLocation = { ...profile };
         setResume(resumeWithSelectedLocation);
         // Persist resume for this user
         if (user?.id) {
           await AsyncStorage.setItem(`resume_${user.id}`, JSON.stringify(resumeWithSelectedLocation));
-          // Send to backend immediately after upload
-          updateUserLocation(user.id, resumeWithSelectedLocation);
         }
       }
     } catch (err: any) {
-      alert(err?.message || 'Failed to upload/parse resume.');
-    } finally {
+      clearInterval(progressInterval);
+      setProgress(0);
       setUploading(false);
-      setProgress(100);
     }
   };
 
