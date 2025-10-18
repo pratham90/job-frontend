@@ -39,9 +39,11 @@ export default function Index(){
     const fetchJobs = async () => {
       if (!user?.id) return;
       try {
-        // Pass location to backend if set
+        // Pass location to backend if set and not 'all'
         const params: any = { limit: 40 };
-        if (location) params.location = location;
+        if (location && location !== 'all') {
+          params.location = location;
+        }
         const res = await fetch(api.recommend(user.id, params));
         if (!res.ok) throw new Error('Failed to fetch jobs');
         const data = await res.json();

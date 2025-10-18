@@ -5,9 +5,9 @@ import { MapPinIcon } from './ui/Icons';
 
 export default function LocationPreference({ location, setLocation }: { location: string, setLocation: (val: string) => void }) {
   const locationOptions = [
+    { label: 'All Location', value: 'all' },
     { label: 'USA', value: 'usa' },
     { label: 'INDIA', value: 'india' },
-    { label: 'Global', value: 'global' },
   ];
 
   return (
