@@ -224,9 +224,9 @@ export default function Index(){
           entering={FadeIn.duration(500)}
           exiting={FadeOut.duration(300)}
         >
-          <LinearGradient colors={['rgba(59,130,246,0.08)', 'rgba(59,130,246,0.02)']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 120 }} />
-          <Text style={styles.title}>Recommended for you</Text>
-          <Text style={styles.subtitle}>Swipe through jobs. Accept to apply, save for later, or reject.</Text>
+          <LinearGradient colors={['rgba(59,130,246,0.08)', 'rgba(59,130,246,0.02)']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 0 }} />
+          {/* <Text style={styles.title}>Recommended for you</Text> */}
+          
           {job ? (
             <JobCard
               job={job}
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: 0,
   },
   card: {
     backgroundColor: '#fff',

@@ -353,8 +353,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
     borderRadius: 18,
-    padding: 18,
-    marginVertical: 12,
+    padding: 0,
+    marginVertical: 5,
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     flexShrink: 1,
     flexGrow: 0,
-    height: 480, // Fixed height for card
+    // height: '90%', // Fixed height for card
     overflow: 'hidden',
   },
   scrollContent: {
