@@ -26,7 +26,7 @@ export default function AppliedScreen() {
       const fetchLikedJobs = async () => {
         if (!user?.id) return;
         try {
-          const res = await fetch(`https://job-assis-povz.onrender.com/api/recommend/liked/${user.id}`);
+          const res = await fetch(`https://job-assis-iicm.onrender.com/api/recommend/liked/${user.id}`);
           if (!res.ok) throw new Error('Failed to fetch liked jobs');
           const data = await res.json();
           setApplied(data || []);

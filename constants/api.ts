@@ -1,6 +1,4 @@
-const API_BASE = "https://job-assis-povz.onrender.com";
-console.log('[API] Using API_BASE:', API_BASE);
-
+const API_BASE = "https://job-assis-iicm.onrender.com";
 export const api = {
   recommend: (clerkId: string, params?: Record<string, string | number | undefined>) => {
     const search = params
