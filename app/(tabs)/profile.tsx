@@ -14,7 +14,6 @@ import TopHeader from '../../components/TopHeader';
 import { LogOutIcon } from '../../components/ui/Icons';
 import { useAuth } from '../../components/AuthContext';
 
-const RESUME_PARSER_API_KEY = process.env.RESUME_PARSER_API_KEY;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -74,11 +73,11 @@ export default function ProfileScreen() {
       formData.append('clerk_id', user?.id || '');
 
       const response = await fetch(
-        RESUME_PARSER_API_KEY || 'https://resume-parse-hpgv.onrender.com/api/users/upload',
+     'https://resume-parse-1.onrender.com/api/users/upload',
         {
           method: 'POST',
           body: formData,
-        }
+        } 
       );
       const text = await response.text();
       let data;

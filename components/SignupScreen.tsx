@@ -98,10 +98,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     alignItems: 'stretch',
-  },
+  }, 
   title: { fontSize: 24, fontWeight: 'bold', color: '#3b82f6', marginBottom: 8, textAlign: 'center' },
   subtitle: { color: '#64748b', fontSize: 15, marginBottom: 18, textAlign: 'center' },
-  input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 15, backgroundColor: '#f1f5fd' },
+  input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 15, backgroundColor: '#f1f5fd' , color:'black'},
   button: { marginTop: 8, marginBottom: 8 },
   error: { color: '#ef4444', textAlign: 'center', marginBottom: 8 },
 });
